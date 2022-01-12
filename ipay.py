@@ -109,7 +109,7 @@ def success(heading, message, optional=0):
     body.grid(row=0, column=0, padx=10, pady=5)
     okbutton.grid(row=1, column=0, pady=10)
 
-def addbalance(payment, passwd, cvv, user): #addmoney function
+def addbalance(payment, passwd, cvv, user, window, addmessage): #addmoney function
     if payment>10000 or payment<0:
         addmessage.configure(text="Invalid (amount between 1-10000)",fg = "red")
     else:
@@ -121,7 +121,7 @@ def addbalance(payment, passwd, cvv, user): #addmoney function
                 if cvv == getcvvpass[1]:
                     mc.execute(f"update userinfo set balance=balance+{int(payment)} where accno = {user}")
                     transactionappend("Self", "Credit", user)
-                    #success("Success!", "₹"+str(payment)+" has been added to your account", window)
+                    success("Success!", "₹"+str(payment)+" has been added to your account", window)
                     activebalance(user)
                 
                 else:
@@ -133,10 +133,57 @@ def addbalance(payment, passwd, cvv, user): #addmoney function
             addmessage.configure(text="Invalid password!",fg = "red")
         con.commit()
 
+
 def activebalance(user):
     x=mc.execute(f"select balance from userinfo where accno = {user}")
     bal=mc.fetchone()
     homebalance.configure(text="Your Balance is ₹"+str(bal[0]))
+
+
+def transactionappend(to, credit_debit, usernow):
+    x=mc.execute(f"select balance from userinfo where accno = {usernow}")
+    bal=mc.fetchone()
+    mc.execute(f"insert into transaction_history (acc_no, date_of_transaction, debit_credit, recipient, balance, Time) values ({usernow}, CURDATE(), '{credit_debit}', '{to}', {bal[0]}, CURTIME())")
+    con.commit()
+
+
+
+def sendlogic(user, window, sendmessage, payment, passwd, cvv, recieve):
+    mc.execute(f"select balance,password,cvv from userinfo where accno = {user}")
+    getinfo=mc.fetchone()
+    if getinfo[0]<payment:
+        sendmessage.configure(text="Too poor to pay",fg = "red")
+    else:
+        if passwd == getinfo[1]:
+            if cvv.isdigit():
+                cvv=int(cvv)
+                if cvv == getinfo[2]:
+                    mc.execute("select username, accno from userinfo")
+                    username=mc.fetchall()
+                    true=0
+                    for i in username:
+                        if i[0]==recieve:
+                            recieve_accno=i[1]
+                            true=1
+                    if true==1:
+                        mc.execute(f"update userinfo set balance=balance-{int(payment)} where accno = {user}")
+                        mc.execute(f"update userinfo set balance=balance+{int(payment)} where accno = {recieve_accno}")
+                        activebalance(user)
+                        mc.execute(f"select accno from userinfo where username = \"{recieve}\"")
+                        y=(mc.fetchone())[0]
+                        transactionappend(str(recieve_accno), "Debit", user)
+                        transactionappend(str(user), "Credit", y)
+                        success("Success!",str(recieve)+" has been sent ₹"+str(payment)+".", window)
+                    else:
+                        sendmessage.configure(text="Invalid Phone No.",fg = "red")
+                else:
+                    sendmessage.configure(text="Invalid CVV!",fg = "red")                    
+            else:
+                sendmessage.configure(text="CVV is not numeric!",fg = "red")
+        else:
+            sendmessage.configure(text="Invalid password!",fg = "red")
+    con.commit()      
+    return
 
 
 #==================================
@@ -232,7 +279,6 @@ def homepage(user):
     home.title("iPay Home")
     mc.execute(f"select name,balance from userinfo where accno = {user}")
     getinfo = mc.fetchone()
-    print(type(user))
 
     
                 #HomePage Elements
@@ -265,13 +311,10 @@ def addmoneywindow(user, currentbal):
     except:
         print()
     finally:
-        global addmessage
         addmoney = Toplevel()
         addmoney.title("Add Money")
         addmoney.resizable(width=False, height=False)
 
-    
-        balance=Label(addmoney,text="Balance is ₹"+currentbal)
         addmessage = Label(addmoney, text="Enter Details below")
         pay = Label(addmoney, text="Amount to be added:")
         passw = Label(addmoney, text="Enter Password:")
@@ -279,7 +322,7 @@ def addmoneywindow(user, currentbal):
         e_pay = Entry(addmoney, width=15)
         e_pass = Entry(addmoney, show="*", width=15)
         e_cvv = Entry(addmoney, width=15, show="*")
-        pay_but = Button(addmoney, text="ADD", padx=50, pady=10, fg="green", activeforeground="green", command=lambda: addbalance(int(e_pay.get()), e_pass.get(), e_cvv.get(), user))
+        pay_but = Button(addmoney, text="ADD", padx=50, pady=10, fg="green", activeforeground="green", command=lambda: addbalance(int(e_pay.get()), e_pass.get(), e_cvv.get(), user, addmoney, addmessage))
         exit_but = Button(addmoney, text="Back", command=addmoney.destroy, padx=50, pady=10, fg="red", activeforeground="red")
 
 
@@ -292,7 +335,47 @@ def addmoneywindow(user, currentbal):
         pay_but.grid(row=5, column=0)
         exit_but.grid(row=5, column=2)
         addmessage.grid(row=1, column=0, columnspan=3)
-        balance.grid(row=0, column=0, columnspan=3, pady=5)
+
+
+
+def sendmoneywindow(user):
+    try:
+        global sendmoney
+        sendmoney.destroy()
+        return
+    except:
+        print()
+    finally:
+        sendmoney=Toplevel()
+        sendmoney.title("Send Money")
+        sendmoney.resizable(width=False, height=False)
+
+        sendmessage=Label(sendmoney, text="Send Money to another account")
+        recipientuser=Label(sendmoney, text="Reciever's username")
+        payment=Label(sendmoney, text="Enter Amount:")
+        passw=Label(sendmoney, text="Enter Password:")
+        cvv=Label(sendmoney, text="Enter CVV:")
+        e_recipientuser=Entry(sendmoney, width=15)
+        e_payment=Entry(sendmoney, width=15)
+        e_passw=Entry(sendmoney, show="*", width=15)
+        e_cvv=Entry(sendmoney, show="*", width=15)
+        paybutton=Button(sendmoney, text="Pay!", fg="green", padx=50, pady=10, command=lambda: sendlogic(user, sendmoney, sendmessage, int(e_payment.get()), e_passw.get(), e_cvv.get(), e_recipientuser.get()))
+        backbutton=Button(sendmoney, command=sendmoney.destroy, text="Back", fg="red", padx=50, pady=10)
+
+
+        sendmessage.grid(row=0, column=0, columnspan=3, pady=5)
+        recipientuser.grid(row=2, column=0, pady=5, padx=5)
+        e_recipientuser.grid(row=2, column=2, pady=5, padx=5)
+        passw.grid(row=4, column=0, pady=5)
+        e_passw.grid(row=4, column=2, pady=5)
+        cvv.grid(row=5, column=0, pady=5)
+        e_cvv.grid(row=5, column=2, pady=5)
+        payment.grid(row=3, column=0, pady=5)
+        e_payment.grid(row=3, column=2, pady=5)
+        paybutton.grid(row=6, column=0)
+        backbutton.grid(row=6, column=2)
+
+
 
 #=============================================
 #       start of program execution
