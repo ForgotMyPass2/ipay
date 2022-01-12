@@ -5,3 +5,4 @@ Then, move database.sql to home/user root folder and run
 
 also, change mysql username in program to your preference (change to root if you are not sure what your mysql username is)
 
+if in doubt, just contact me :)
