@@ -4,8 +4,10 @@ from tkinter import *
 from tkinter import ttk
 import mysql.connector
 import random
+import os
+import csv
 
-con=mysql.connector.connect(user="ipay", password="test", auth_plugin="mysql_native_password", host="localhost", database="ipay")
+con=mysql.connector.connect(user="ipay", password="test", auth_plugin="mysql_native_password", host="192.168.1.43", database="ipay")
 mc=con.cursor()
 #"mc" is cursor variable.
 #Globals used: Login
@@ -17,8 +19,7 @@ mc=con.cursor()
 
 def closewindow(name):
     name.destroy()
-    #if name=="Login" or name=="home":
-    #    root.destroy()
+    root.destroy()
 
 def signup_get(title, window, getname, getusername, getemail, getphone, getpass, getcardno, getcard_month, getcard_year, getcvv):
     accno_generated=accno_gen()
@@ -182,8 +183,52 @@ def sendlogic(user, window, sendmessage, payment, passwd, cvv, recieve):
                 sendmessage.configure(text="CVV is not numeric!",fg = "red")
         else:
             sendmessage.configure(text="Invalid password!",fg = "red")
-    con.commit()      
-    return
+    con.commit()
+
+
+
+def calculate_elec(title, payment, passwd, cvv, board, user, window):
+    #calculates and deducts electricity bill which has been input by user
+    mc.execute(f"select balance,password,cvv from userinfo where accno = {user}")
+    getinfo=mc.fetchone()
+    if board!="":
+        if getinfo[0]>(payment+100):
+            if passwd == getinfo[1]:
+                if cvv.isdigit():
+                    cvv=int(cvv)
+                    if cvv == getinfo[2]:
+                        mc.execute(f"update userinfo set balance=balance-{int(payment)} where accno = {user}")
+                        success("Success!", "₹"+str(payment)+" has been paid to "+str(board)+".", window)
+                        transactionappend(board, "Debit", user)
+                        activebalance(user)
+                    else:
+                        title.configure(text="Invalid CVV!",fg = "red")
+                else:
+                    title.configure(text="CVV is not numeric!",fg = "red")
+            else:
+                title.configure(text="Invalid password!",fg = "red")
+        else:
+            title.configure(text="Insufficient funds (minimum balance 100)",fg = "red")
+    else:
+        title.configure(text="Choose Board!",fg = "red")
+    con.commit()
+
+
+
+def transactionlist(user):
+    x=mc.execute(f"select date_of_transaction, Time, debit_credit, recipient, balance from transaction_history where acc_no = {user}")
+    listall=mc.fetchall()
+    y=mc.execute(f"select name from userinfo where accno = {user}")
+    name=mc.fetchone()        
+    f=open(f"Transaction_history_of_{name[0]}.csv", "w", newline="")
+    write=csv.writer(f)
+    field=("Date of Transaction", "Time", "Debit/Credit", "Recipient", "Balance")
+    write.writerow(field)
+    for i in listall:
+          write.writerow(i)
+    f.close()
+    os.system(f"chromium Transaction_history_of_{name[0]}.csv") 
+
 
 
 #==================================
@@ -374,6 +419,53 @@ def sendmoneywindow(user):
         e_payment.grid(row=3, column=2, pady=5)
         paybutton.grid(row=6, column=0)
         backbutton.grid(row=6, column=2)
+
+def payelectric(user):
+    #Try and except so that previous instance is closed before another is opened
+    try:
+        global bill1
+        bill1.destroy()
+        return
+    except:
+        print()
+    finally:
+        x=mc.execute(f"select balance from userinfo where accno = {user}")
+        bal=mc.fetchone()
+        bill1 = Toplevel()
+        bill1.resizable(width=False, height=False)
+        bill1.title("Pay Bills")
+        n=StringVar()
+
+        
+        #Bill Page Elements
+        title = Label(bill1 ,text="Pay Electricity bill")
+        billamount = Label(bill1, text="Enter Amount:", padx=5)
+        Accpasswd = Label(bill1, text="Enter Password:", padx=5)
+        AccCVV = Label(bill1, text="Enter CVV:", padx=5)
+        elecboard = Label(bill1, text="Select Board:")
+        select_elecboard=ttk.Combobox(bill1, textvariable=n, width=15, state = "readonly")
+        closebutton = Button(bill1, text="Close", command=bill1.destroy, fg="red", padx=50, pady=10)
+        e_billamount = Entry(bill1,width=16)
+        e_Accpasswd = Entry(bill1,width=16, show="*")
+        e_AccCVV = Entry(bill1,width=16, show="*")
+        paybutton = Button(bill1, text="Pay!", padx=50, pady=10,command=lambda: calculate_elec(title, int(e_billamount.get()), e_Accpasswd.get(), e_AccCVV.get(), select_elecboard.get(), user, bill1), fg="green")
+        select_elecboard['values'] = ('BESCOM','CESC Mysore','GESCOM','HESCOM','MESCOM')
+        select_elecboard.current(0)
+
+
+        #Bill page Grid
+        title.grid(row=0, column=0, columnspan=3, pady=5)
+        elecboard.grid(row=4, column=0, pady=5, padx=5)
+        select_elecboard.grid(row=4, column=2)
+        closebutton.grid(row=10, column=2, pady=5, padx=6)
+        paybutton.grid(row=10, column=0, pady=5, padx=19)
+        Accpasswd.grid(row=5, column=0, pady=5, padx=5)
+        AccCVV.grid(row=6, column=0, pady=5, padx=5)
+        e_Accpasswd.grid(row=5, column=2, pady=5, padx=5)
+        e_AccCVV.grid(row=6, column=2, pady=5, padx=5)
+        billamount.grid(row=3, column=0, pady=5, padx=5)
+        e_billamount.grid(row=3, column=2, pady=5, padx=5)
+
 
 
 
