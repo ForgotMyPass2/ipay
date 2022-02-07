@@ -6,8 +6,11 @@ import mysql.connector
 import random
 import os
 import csv
+import wx
+import wx.grid as grid
+ 
 
-con=mysql.connector.connect(user="ipay", password="test", auth_plugin="mysql_native_password", host="192.168.1.43", database="ipay")
+con=mysql.connector.connect(user="ipay", password="test", auth_plugin="mysql_native_password", host="0.tcp.in.ngrok.io", port="12912", database="ipay")
 mc=con.cursor()
 #"mc" is cursor variable.
 #Globals used: Login
@@ -172,11 +175,11 @@ def sendlogic(user, window, sendmessage, payment, passwd, cvv, recieve):
                         activebalance(user)
                         mc.execute(f"select accno from userinfo where username = \"{recieve}\"")
                         y=(mc.fetchone())[0]
-                        transactionappend(str(recieve_accno), "Debit", user)
+                        transactionappend(str(recieve), "Debit", user)
                         transactionappend(str(user), "Credit", y)
                         success("Success!",str(recieve)+" has been sent ₹"+str(payment)+".", window)
                     else:
-                        sendmessage.configure(text="Invalid Phone No.",fg = "red")
+                        sendmessage.configure(text="Invalid username",fg = "red")
                 else:
                     sendmessage.configure(text="Invalid CVV!",fg = "red")                    
             else:
@@ -208,7 +211,7 @@ def calculate_elec(title, payment, passwd, cvv, board, user, window):
             else:
                 title.configure(text="Invalid password!",fg = "red")
         else:
-            title.configure(text="Insufficient funds (minimum balance 100)",fg = "red")
+            title.configure(text="Insufficient funds",fg = "red")
     else:
         title.configure(text="Choose Board!",fg = "red")
     con.commit()
@@ -227,7 +230,7 @@ def transactionlist(user):
     for i in listall:
           write.writerow(i)
     f.close()
-    os.system(f"chromium Transaction_history_of_{name[0]}.csv") 
+    trans_hist(f"Transaction_history_of_{name[0]}.csv") 
 
 
 
@@ -289,7 +292,7 @@ def signuppage():   #signup page accessible via login page
     e_passw=Entry(signup, show="*")
     e_cardno=Entry(signup)
     e_card_month=Spinbox(signup, from_=1, to=12, width=8, state = "readonly")
-    e_card_year=Spinbox(signup, from_=2021, to=2026, width=8, state = "readonly")
+    e_card_year=Spinbox(signup, from_=2023, to=2028, width=8, state = "readonly")
     e_cvv=Entry(signup, show="*")
 
                     #placement of window elements
@@ -467,12 +470,52 @@ def payelectric(user):
         e_billamount.grid(row=3, column=2, pady=5, padx=5)
 
 
+def trans_hist(filename):
+    print(filename)
+    open_file=open(filename,"r")
+    file=csv.reader(open_file)
+    tablerows=0
+    data=[]
+    for i in file:
+        tablerows+=1
+        data.append(i)      
+   
+    class MyFrame(wx.Frame):
+        def __init__(self, parent, title):
+            super(MyFrame, self).__init__(parent, title =title, size = (480,600))
+            self.panel = MyPanel(self)
+     
+     
+    class MyPanel(wx.Panel):
+        def __init__(self, parent):
+            super(MyPanel, self).__init__(parent)   
 
+            mygrid = grid.Grid(self)
+            mygrid.CreateGrid(tablerows,5)
+
+            for x in range(tablerows):
+                for y in range(5):
+                    cellvalue=data[x][y]
+                    mygrid.SetCellValue(x,y,str(cellvalue))
+                    mygrid.SetReadOnly(x,y,True)
+
+            sizer = wx.BoxSizer(wx.VERTICAL)
+            sizer.Add(mygrid, 1, wx.EXPAND)
+            self.SetSizer(sizer)
+
+    class MyApp(wx.App):
+        def OnInit(self):
+            self.frame = MyFrame(parent=None, title=filename)
+            self.frame.Show()
+            return True
+
+    app = MyApp()
+    app.MainLoop()
 
 #=============================================
 #       start of program execution
 #=============================================
 root=Tk()
 root.withdraw()
-loginwindow()    
+loginwindow() 
     
