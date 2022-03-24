@@ -275,7 +275,7 @@ def signuppage():   #signup page accessible via login page
     signup.title("Sign up!")
 
     title=Label(signup, text="Enter Details below")
-    name=Label(signup, text="Name(no spaces) :")
+    name=Label(signup, text="Name:")
     username=Label(signup, text="Username:")
     email=Label(signup, text="Email:")
     phone=Label(signup, text="Phone Number:")
